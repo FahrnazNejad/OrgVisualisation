@@ -48,6 +48,7 @@ This installs pandas from PyPI.
 ## 4. Prepare the data
 
 1. The `employees_hris.json`  should have the following structure for each Employee and follow HRIS.
+```
 {
     "employee_id": "1000",
     "first_name": "Alice",
@@ -59,7 +60,7 @@ This installs pandas from PyPI.
     "department": "Corporate",
     "job_title": "CEO"
   }
-
+```
 2. Run the Python script to build the hierarchical JSON:
 
    ```bash
