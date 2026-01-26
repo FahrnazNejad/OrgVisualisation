@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Org Chart Circle Packing</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    svg  { display: block; margin: auto; cursor: pointer; }
+
+    .tooltip {
+      position: absolute;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      font-size: 12px;
+      border-radius: 4px;
+      pointer-events: none;
+      line-height: 1.3;
+      white-space: nowrap;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    /* Fixed title in upper-left corner */
+    .title-box {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      padding: 6px 10px;
+      background: #000;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      z-index: 20;
+    }
+    .title-box .company {
+      color: #ffffff;
+    }
+    .title-box .org {
+      color: #ff3333;
+    }
+  </style>
+</head>
+<body>
+<div class="title-box">
+  <span class="company">Porsche </span><span class="org">Digital</span>
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+const width = 932, height = 932;
+
+const color = d3.scaleLinear()
+  .domain([0, 5])
+  .range(["hsl(152,80%,80%)", "hsl(228,30%,40%)"])
+  .interpolate(d3.interpolateHcl);
+
+const tooltip = d3.select('#tooltip');
+
+d3.json("employees_hierarchy.json").then(data => {
+  const pack = data => d3.pack()
+      .size([width, height])
+      .padding(3)
+    (d3.hierarchy(data)
+      .sum(d => d.value)
+      .sort((a, b) => b.value - a.value));
+
+  const root = pack(data);
+  let focus = root;
+  let view;
+
+  const svg = d3.select("body").append("svg")
+      .attr("viewBox", `-${width/2} -${height/2} ${width} ${height}`)
+      .attr("width", width)
+      .attr("height", height)
+      .style("background", color(0))
+      .on("click", (event) => zoom(event, root));
+
+  const node = svg.append("g")
+    .selectAll("circle")
+    .data(root.descendants().slice(1))
+    .join("circle")
+      .attr("fill", d => d.children ? color(d.depth) : "white")
+      .on("mouseover", function(event, d) {
+        d3.select(this).attr("stroke", "#000");
+        const info = d.data;
+        tooltip
+          .style("opacity", 1)
+          .html(
+            `<strong>${info.name || ''}</strong><br>` +
+            `${info.role || ''}<br>` +
+            `${info.email || ''}<br>` +
+            `${info.phone || ''}`
+          );
+      })
+      .on("mousemove", function(event) {
+        tooltip
+          .style("left", (event.pageX + 10) + "px")
+          .style("top",  (event.pageY + 10) + "px");
+      })
+      .on("mouseout", function() {
+        d3.select(this).attr("stroke", null);
+        tooltip.style("opacity", 0);
+      })
+      .on("click", (event, d) => focus !== d && (zoom(event, d), event.stopPropagation()));
+
+  // Labels (skip the root "Organization" node entirely)
+  const label = svg.append("g")
+      .style("font", "10px sans-serif")
+      .attr("pointer-events", "none")
+      .attr("text-anchor", "middle")
+    .selectAll("text")
+    .data(root.descendants().filter(d => d !== root))
+    .join("text")
+      .style("display", "none")
+      .text(d => d.data.name);
+
+  const MIN_LABEL_R = 8;
+
+  function updateLabelsVisibility() {
+    const k = width / view[2];
+
+    label
+      .style("display", d => {
+        const r = d.r * k;
+
+        if (d === focus) return "inline";                    // focused manager
+        if (d.parent === focus && r >= MIN_LABEL_R) return "inline"; // reports
+        return "none";
+      })
+      .style("fill-opacity", d => {
+        const r = d.r * k;
+        if (d === focus) return 1;
+        if (d.parent === focus && r >= MIN_LABEL_R) return 1;
+        return 0;
+      })
+      .style("font-size", d => {
+        const r = d.r * k;
+        if (d === focus) return "14px";                     // bigger for manager
+        if (d.parent === focus && r >= MIN_LABEL_R) return "10px";
+        return "10px";
+      })
+      .style("font-weight", d => d === focus ? "700" : "400");
+  }
+
+  // Initial positioning; no labels shown
+  zoomTo([root.x, root.y, root.r * 2]);
+
+  function zoomTo(v) {
+    const k = width / v[2];
+    view = v;
+    label.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+    node.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+    node.attr("r", d => d.r * k);
+  }
+
+  function zoom(event, d) {
+    focus = d;
+    const transition = svg.transition()
+        .duration(event.altKey ? 7500 : 750)
+        .tween("zoom", () => {
+          const i = d3.interpolateZoom(view, [focus.x, focus.y, focus.r * 2]);
+          return t => {
+            zoomTo(i(t));
+            updateLabelsVisibility();
+          };
+        });
+  }
+});
+</script>
+</body>
+</html>
