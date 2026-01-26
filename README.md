@@ -1,8 +1,8 @@
 # OrgVisualisation
+Interactive D3.js circle-packing visualisation of Porsche Digital org chart, backed by a Python script that converts HR-style employee data into a hierarchy.
 This Repository is to explore the feasibility of visualising the Organisation using the Data from Leapsome
 
 
-Interactive D3.js circle-packing visualisation of Porsche Digital org chart, backed by a Python script that converts HR-style employee data into a hierarchy.
 
 ## 1. Prerequisites
 
@@ -23,7 +23,7 @@ python3 --version
 
 ## 2. Project structure
 
-Place these files in the rood directory:
+Place these files in the root directory:
 
 ```text
   employees_hris.json        # flat HR-style employee data
@@ -119,4 +119,3 @@ Ctrl + C
 ```
 
 This stops the local server. 
-```
