@@ -85,7 +85,7 @@ From the root directory of the project:
 python -m http.server 8000
 ```
 
-(Use `python3 -m http.server 8000` if `python` is Python 2 on your machine.)
+(Use `python3 -m http.server 8000` if `python` is Python 3 on your machine.)
 
 You should see something like:
 
