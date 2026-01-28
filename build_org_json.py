@@ -1,64 +1,88 @@
 import json
-import pandas as pd
+from collections import defaultdict
 
-# 1. Load HRIS-style flat JSON
-with open("employees_hris.json", "r", encoding="utf-8") as f:
-    data = json.load(f)
+INPUT_FILE = "employees_raw_generated.json"
+OUTPUT_FILE = "employees_hierarchy.json"
 
-df = pd.DataFrame(data)
+with open(INPUT_FILE, "r", encoding="utf-8") as f:
+    employees = json.load(f)
 
-# 2. Rename columns to simpler internal names
-df = df.rename(columns={
-    "employee_id": "pnumber",
-    "first_name": "first_name",
-    "last_name": "last_name",
-    "work_email": "email",
-    "work_phone": "phone",
-    "manager_id": "manager_pnumber",
-    "department": "portfolio",
-    "job_title": "role"
-})
+# convenience: default nested dict of dicts → list
+def nested_dict():
+    return defaultdict(nested_dict)
 
-# 3. Build node dict for each employee
-employees = {
-    row.pnumber: {
-        "name": f"{row.first_name} {row.last_name}",
-        "PNumber": row.pnumber,
-        "email": row.email,
-        "phone": row.phone,
-        "location": row.location,
-        "portfolio": row.portfolio,
-        "role": row.role,
-        "children": []
-    }
-    for _, row in df.iterrows()
+root = {
+    "name": "Company Organization",
+    "level": "company",
+    "children": []
 }
 
-# 4. Link managers to their direct reports and find roots
-roots = []
-for _, row in df.iterrows():
-    emp_id = row.pnumber
-    mgr_id = row.manager_pnumber
+# group structure:
+# portfolio -> value_stream -> art -> team -> list[employees]
+grouped = defaultdict(
+    lambda: defaultdict(
+        lambda: defaultdict(
+            lambda: defaultdict(list)
+        )
+    )
+)
 
-    if pd.isna(mgr_id) or mgr_id is None or str(mgr_id) not in employees:
-        roots.append(employees[emp_id])
-    else:
-        employees[str(mgr_id)]["children"].append(employees[emp_id])
+for emp in employees:
+    portfolio = emp.get("custom_66bb4781e4736654749e352d") or "Unassigned Portfolio"
+    vs        = emp.get("custom_66bb4829e4736654749f2e55") or "Unassigned Value Stream"
+    art       = emp.get("custom_66bb489ee4736654749fc6b4") or "Unassigned ART"
+    team      = emp.get("custom_66c5ce5d8f12f9a7dd0c4f95") or "Unassigned Team"
 
-# 5. Compute "value" (size) for circle packing
-def add_values(node):
-    if not node["children"]:
-        node["value"] = 1
-        return 1
-    total = 0
-    for child in node["children"]:
-        total += add_values(child)
-    node["value"] = total
-    return total
+    grouped[portfolio][vs][art][team].append(emp)
 
-org_tree = {"name": "Organization", "children": roots}
-add_values(org_tree)
+for portfolio, vs_dict in grouped.items():
+    portfolio_node = {
+        "name": portfolio,
+        "level": "portfolio",
+        "children": []
+    }
 
-# 6. Save hierarchy JSON for D3
-with open("employees_hierarchy.json", "w", encoding="utf-8") as f:
-    json.dump(org_tree, f, ensure_ascii=False, indent=2)
+    for vs, art_dict in vs_dict.items():
+        vs_node = {
+            "name": vs,
+            "level": "value_stream",
+            "children": []
+        }
+
+        for art, team_dict in art_dict.items():
+            art_node = {
+                "name": art,
+                "level": "art",
+                "children": []
+            }
+
+            for team, people in team_dict.items():
+                team_node = {
+                    "name": team,
+                    "level": "product_team",
+                    "children": []
+                }
+
+                for emp in people:
+                    person_node = {
+                        "name": emp.get("displayName"),
+                        "level": "person",
+                        "userId": emp.get("userId"),
+                        "manager_id": emp.get("manager_id"),
+                        "title": emp.get("title"),
+                        "role": emp.get("custom_672b20f1eb514012f7443658"),
+                        "department": emp.get("department"),
+                        "location": emp.get("workLocation"),
+                        # keep original raw object if you want more fields:
+                        # "raw": emp
+                    }
+                    team_node["children"].append(person_node)
+
+                art_node["children"].append(team_node)
+            vs_node["children"].append(art_node)
+        portfolio_node["children"].append(vs_node)
+
+    root["children"].append(portfolio_node)
+
+with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+    json.dump(root, f, ensure_ascii=False, indent=2)
