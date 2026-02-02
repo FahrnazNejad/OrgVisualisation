@@ -106,3 +106,7 @@ Hovering over the circle for each employee will show the following information f
 The TreeView tab wish show the whole organization tree view. Initially it will only show the head of the portfolios as shown below.
 
 ![Org visualization TreeView page](TreeView.png)
+
+Clicking on the name of each person will show the people reporting to them directly, as shown below.
+
+![Org visualization TreeViewExpand page](TreeViewExpand.png)
