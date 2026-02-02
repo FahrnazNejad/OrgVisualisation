@@ -45,24 +45,43 @@ Non-leaf nodes (company, portfolio, value_stream, art, product_team) must have:
 - `children`: array of nested nodes
 
 ## Usage
+### Installation
+
+Check if Python 3 is already installed:
+
+`python3 --version`
+
+If the command is not found or the version is old, install a current Python 3 from https://www.python.org/downloads/mac-osx/.
+Go to https://www.python.org/downloads/
+* Click “Download Python 3.x” for macOS.
+* Open the downloaded `.pkg` file and run through the installer (keep all defaults).
+* Open Terminal and check it works:
+
+`python3 --version`
 
 ### Generate data
 In case if you don't have access to the real data of the employees.
 Before opening the HTML file, generate the input JSON from your source data:
 
 `python3 generate_data.py`
+
 This script will generate a json file, following the same structure retrieved from Leapsome.
 
 For data enqueries, contact @Omar Asimi.
 
 ### Build the Organisiation Heirarchy Json file
+
 Once you have generated the synthetic data or placed the real data in the project folder, run the following script to build the heirarchy json file.
+
 `python3 build_org_json.py`
+
+
 <strong><span style="color:red">!NOTE:</span></strong> The original data should be renamed to <strong><span>emplemployees_raw.json</span></strong>.
 
 ### Run the local server
 
 In order to view the organisation visualisation, first you should run the server, using this script:
+
 `python3 -m http.server 8000`
 
 ### View the Organisation Visualisation
