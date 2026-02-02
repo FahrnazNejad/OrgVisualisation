@@ -2,7 +2,7 @@ import json
 from collections import defaultdict
 
 
-INPUT_FILE = "employees_raw_generated.json"
+INPUT_FILE = "employees_raw.json"
 OUTPUT_FILE = "employees_hierarchy.json"
 
 with open(INPUT_FILE, "r", encoding="utf-8") as f:

@@ -1,7 +1,7 @@
 import json
 import random
 
-OUTPUT_FILE = "employees_raw_generated.json"
+OUTPUT_FILE = "employees_raw.json"
 
 random.seed(42)
 
