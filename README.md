@@ -98,3 +98,6 @@ It will open the following page:
 Searching the name of an employee in the search box, will zoom into the Product Team/ ART/ Value Stream/ Portfolio of that employee in the left and and clicking on their name, shows their direct and inderct managers on the righ side. Below there is an example how it will look:
 
 ![Org visualization Search page](Search.png)
+
+Hovering over the circle for each employee will show the following information for that person.
+![Org visualization mouseover](mouseover.png)
