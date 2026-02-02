@@ -52,6 +52,7 @@ Check if Python 3 is already installed:
 `python3 --version`
 
 If the command is not found or the version is old, install a current Python 3 from https://www.python.org/downloads/mac-osx/.
+
 Go to https://www.python.org/downloads/
 * Click “Download Python 3.x” for macOS.
 * Open the downloaded `.pkg` file and run through the installer (keep all defaults).
@@ -89,3 +90,7 @@ In order to view the organisation visualisation, first you should run the server
 Open your browser and go to:
 
 `http://localhost:8000/index.html`.
+
+It will open the following page:
+
+![Org visualization initial page](initial_page.png)
