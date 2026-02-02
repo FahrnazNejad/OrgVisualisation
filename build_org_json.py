@@ -1,15 +1,15 @@
 import json
 from collections import defaultdict
 
+
 INPUT_FILE = "employees_raw_generated.json"
 OUTPUT_FILE = "employees_hierarchy.json"
 
 with open(INPUT_FILE, "r", encoding="utf-8") as f:
     employees = json.load(f)
 
-# convenience: default nested dict of dicts → list
-def nested_dict():
-    return defaultdict(nested_dict)
+# lookup: userId -> raw employee (for manager email, etc.)
+emp_by_id = {e.get("userId"): e for e in employees}
 
 root = {
     "name": "Company Organization",
@@ -64,17 +64,20 @@ for portfolio, vs_dict in grouped.items():
                 }
 
                 for emp in people:
+                    manager_id = emp.get("manager_id")
+                    manager = emp_by_id.get(manager_id) if manager_id else None
+
                     person_node = {
                         "name": emp.get("displayName"),
                         "level": "person",
                         "userId": emp.get("userId"),
-                        "manager_id": emp.get("manager_id"),
+                        "manager_id": manager_id,
                         "title": emp.get("title"),
                         "role": emp.get("custom_672b20f1eb514012f7443658"),
                         "department": emp.get("department"),
                         "location": emp.get("workLocation"),
-                        # keep original raw object if you want more fields:
-                        # "raw": emp
+                        "productTeam": team,
+                        "managerEmail": manager.get("email") if manager else None,
                     }
                     team_node["children"].append(person_node)
 

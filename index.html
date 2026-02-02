@@ -1,521 +1,741 @@
 <!DOCTYPE html>
-<meta charset="utf-8">
-<title>Org Circle Packing + Clickable Context Org Tree</title>
+<meta charset="utf-8" />
+<title>Org Circle + Manager Chain Panel + Tree Tab</title>
+
 <style>
   body {
     margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    display: flex;
-    flex-direction: row;
+    font-family: system-ui, -apple-system, sans-serif;
     height: 100vh;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
-  #viz-container {
-    flex: 1;
-    position: relative;
+
+  /* top black ribbon */
+  #top-ribbon {
+    width: 100%;
+    background: #000000;
+    color: #ffffff;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
   }
-  #org-panel {
-    flex: 1;
-    border-left: 1px solid #ddd;
-    font-size: 13px;
-    overflow: hidden;
+  #top-ribbon .brand-white { color: #ffffff; margin-right: 4px; }
+  #top-ribbon .brand-red { color: #ff3b30; }
+
+  #tabs {
+    display: flex;
+    border-bottom: 1px solid #ddd;
     background: #fafafa;
-    position: relative;
+    z-index: 10;
   }
+  .tab-btn {
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+    border-right: 1px solid #ddd;
+    background: #f0f0f0;
+    font-size: 13px;
+  }
+  .tab-btn.active {
+    background: #ffffff;
+    font-weight: 600;
+    border-bottom: 2px solid #007bff;
+  }
+  #search-container {
+    margin-left: auto;
+    padding: 6px 12px;
+  }
+  #search-input {
+    padding: 5px 8px;
+    font-size: 13px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  #search-button {
+    padding: 5px 12px;
+    font-size: 13px;
+    margin-left: 4px;
+    cursor: pointer;
+  }
+
+  #content {
+    flex: 1;
+    position: relative;
+    background: #f7f7f7;
+  }
+
+  /* Circle container: full width by default, only 50% when zoomed */
+  #circle-container {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 100%;
+    overflow: hidden;          /* clipping happens here */
+    transition: width 250ms ease;
+  }
+  #circle-container.split {
+    width: 50%;
+  }
+
+  /* Right panel: hidden by default, shown only when zoomed (and person selected) */
+  #right-panel {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 50%;
+    display: none;
+    background: #ffffff;
+    border-left: 1px solid #e6e6e6;
+  }
+  #right-panel.show { display: block; }
+
+  #panel-header {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    border-bottom: 1px solid #eee;
+    background: #fafafa;
+  }
+  #panel-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: #111;
+  }
+  #panel-subtitle {
+    font-size: 12px;
+    color: #666;
+    margin-left: 10px;
+    font-weight: 500;
+  }
+  #panel-header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  #panel-close {
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  #panel-body {
+    position: absolute;
+    top: 48px; left: 0; right: 0; bottom: 0;
+    overflow: auto;
+  }
+
+  /* chain svg */
+  #chain-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: #fff;
+  }
+
+  /* Tree container (full width) */
+  #tree-container {
+    position: absolute;
+    inset: 0;
+    display: none;
+  }
+
   svg {
     width: 100%;
     height: 100%;
     display: block;
     background: #f7f7f7;
   }
-  .node {
-    cursor: pointer;
-  }
-  .node:hover {
-    stroke: #000;
-    stroke-width: 1.5px;
-  }
-  .node--leaf {
-    fill: white;
-  }
-  .label {
-    font-size: 11px;
-    text-anchor: middle;
-    pointer-events: none;
-  }
+
+  .node { cursor: pointer; }
+  .node--leaf { fill: white; }
+  .label { font-size: 11px; text-anchor: middle; pointer-events: none; }
+
   .tooltip {
     position: absolute;
-    padding: 6px 8px;
-    background: rgba(0,0,0,0.8);
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.85);
     color: #fff;
     border-radius: 4px;
     font-size: 12px;
     pointer-events: none;
     opacity: 0;
+    z-index: 100;
+    line-height: 1.4;
   }
-  #search-container {
-    position: fixed;
-    top: 10px;
-    right: 16px;
-    z-index: 10;
+
+  /* chain styles */
+  .chain-link {
+    fill: none;
+    stroke: #cfcfcf;
+    stroke-width: 2px;
   }
-  #search-input {
-    padding: 4px 6px;
+  .chain-card {
+    fill: #fff;
+    stroke: #d8d8d8;
+    stroke-width: 1.5px;
+    rx: 10;
+    ry: 10;
+  }
+  .chain-card.manager {
+    stroke: #ff9500;
+    stroke-width: 2px;
+  }
+  .chain-card.selected {
+    stroke: #007bff;
+    stroke-width: 3px;
+  }
+  .chain-name {
     font-size: 13px;
+    font-weight: 700;
+    fill: #111;
+    text-anchor: middle;
   }
-  #search-button {
-    padding: 4px 8px;
-    font-size: 13px;
-    margin-left: 4px;
+  .chain-title {
+    font-size: 12px;
+    fill: #666;
+    text-anchor: middle;
   }
-  #org-tree-svg {
-    width: 100%;
-    height: 100%;
+  .chain-level {
+    font-size: 11px;
+    fill: #888;
+    text-anchor: middle;
   }
+
+  /* Tree styles (from your reference) */
   .org-node rect {
-    fill: #f5e3d3;
+    fill: #fff;
     stroke: #d4c0af;
-    rx: 6;
-    ry: 6;
+    rx: 6; ry: 6;
+    cursor: pointer;
   }
   .org-node text {
     font-size: 11px;
     text-anchor: middle;
+    pointer-events: none;
   }
   .org-link {
     fill: none;
-    stroke: #999;
-    stroke-width: 1.2px;
+    stroke: #ccc;
+    stroke-width: 1.5px;
+  }
+
+  /* NEW: zoomed circle title */
+  .circle-focus-title {
+    font-weight: 800;
+    fill: #000;
+    font-size: 20px;
+    text-anchor: middle;
+    pointer-events: none;
   }
 </style>
 
 <body>
-<div id="viz-container">
-  <div id="tooltip" class="tooltip"></div>
-
-  <div id="search-container">
-    <input id="search-input" type="text" placeholder="Search person..." />
-    <button id="search-button">Search</button>
+  <div id="top-ribbon">
+    <span class="brand-white">Company</span>
+    <span class="brand-red">Organization</span>
   </div>
 
-  <svg id="circle-svg"></svg>
-</div>
+  <div id="tabs">
+    <button id="tab-circle" class="tab-btn active">Circle view</button>
+    <button id="tab-tree" class="tab-btn">Tree view</button>
+    <div id="search-container">
+      <input id="search-input" type="text" placeholder="Search person..." />
+      <button id="search-button">Search</button>
+    </div>
+  </div>
 
-<div id="org-panel">
-  <svg id="org-tree-svg"></svg>
-</div>
+  <div id="content">
+    <div id="circle-container">
+      <div id="tooltip" class="tooltip"></div>
+      <svg id="circle-svg"></svg>
+    </div>
 
-<script src="https://d3js.org/d3.v7.min.js"></script>
-<script>
-const circleSvg = d3.select("#circle-svg");
-const width  = document.getElementById("viz-container").clientWidth;
-const height = document.getElementById("viz-container").clientHeight;
-const margin = 20;
+    <!-- Right chain panel (shown only when zoomed + person selected) -->
+    <div id="right-panel">
+      <div id="panel-header">
+        <div id="panel-header-left">
+          <div id="panel-title">Manager chain</div>
+          <div id="panel-subtitle"></div>
+        </div>
+        <button id="panel-close" title="Close">Close</button>
+      </div>
+      <div id="panel-body">
+        <svg id="chain-svg"></svg>
+      </div>
+    </div>
 
-const g = circleSvg.append("g")
-  .attr("transform", `translate(${width / 2},${height / 2})`);
+    <!-- Tree view (restored) -->
+    <div id="tree-container">
+      <svg id="org-tree-svg"></svg>
+    </div>
+  </div>
 
-const color = d3.scaleOrdinal()
-  .domain(["company","portfolio","value_stream","art","product_team","person"])
-  .range(["#f1f1f1","#c7e9c0","#9ecae1","#fdd0a2","#d4b9da","#ffffff"]);
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    /* ----------------- globals ----------------- */
+    let circleNodesData = [];
+    let personById = new Map();   // userId -> person (includes manager_id)
+    let viewGlobal = null;
+    let focusGlobal = null;
+    let circleRootGlobal = null;
 
-const pack = d3.pack()
-  .size([width - 2 * margin, height - 2 * margin])
-  .padding(3);
+    let selectedPersonId = null;
 
-const tooltip = d3.select("#tooltip");
-const MIN_LABEL_RADIUS = 18;
+    // Tree globals (restored)
+    let fullHierarchyRoot = null;
+    let currentTreeHighlightId = null;
 
-// org tree
-const orgSvg = d3.select("#org-tree-svg");
-const orgWidth  = document.getElementById("org-panel").clientWidth;
-const orgHeight = document.getElementById("org-panel").clientHeight;
-const orgG = orgSvg.append("g")
-  .attr("transform", `translate(${orgWidth / 2}, 40)`);
+    /* ----------------- DOM refs ----------------- */
+    const tabCircleBtn = document.getElementById("tab-circle");
+    const tabTreeBtn   = document.getElementById("tab-tree");
+    const circleContainer = document.getElementById("circle-container");
+    const treeContainer   = document.getElementById("tree-container");
 
-const treeLayout = d3.tree()
-  .size([orgWidth - 160, orgHeight - 160]);
+    const rightPanel = document.getElementById("right-panel");
+    const panelSubtitle = document.getElementById("panel-subtitle");
+    const panelClose = document.getElementById("panel-close");
 
-const boxWidth = 130;
-const boxHeight = 50;
-
-d3.json("employees_hierarchy.json").then(data => {
-  // ------------ circle packing ------------
-  const root = d3.hierarchy(data)
-    .sum(d => d.level === "person" ? 1 : 0)
-    .sort((a, b) => b.value - a.value);
-
-  const nodes = pack(root).descendants();
-  let focus = root;
-  let view;
-
-  const circle = g.selectAll("circle")
-    .data(nodes)
-    .join("circle")
-      .attr("class", d =>
-        d.parent ? (d.children ? "node" : "node node--leaf") : "node node--root"
-      )
-      .attr("fill", d => color(d.data.level || (d.children ? "company" : "person")))
-      .on("click", (event, d) => {
-        if (!d.children && d.data.level === "person") {
-          renderContextTree(d.data.userId);
-        }
-        if (focus !== d) {
-          zoom(event, d);
-          event.stopPropagation();
-        }
-      })
-      .on("mousemove", (event, d) => {
-        if (!d.children && d.data.level === "person") {
-          const p = d.data;
-          tooltip
-            .style("opacity", 1)
-            .style("left", (event.pageX + 10) + "px")
-            .style("top", (event.pageY + 10) + "px")
-            .html(
-              `<strong>${p.name}</strong><br>
-               ${p.title || ""}<br>
-               ${p.department || ""}<br>
-               ${p.location || ""}`
-            );
-        }
-      })
-      .on("mouseleave", () => {
-        tooltip.style("opacity", 0);
-      });
-
-  const text = g.selectAll("text.node-label")
-    .data(nodes.filter(d => d !== root))
-    .join("text")
-      .attr("class", "label node-label")
-      .text(d => d.data.name);
-
-  const node = g.selectAll("circle,text.node-label");
-
-  const focusLabel = g.append("text")
-    .attr("class", "label")
-    .attr("font-weight", "bold")
-    .attr("text-anchor", "middle")
-    .style("pointer-events", "none");
-
-  const companyGroup = g.append("g").style("pointer-events", "none");
-  const companyBg = companyGroup.append("rect")
-    .attr("rx", 4)
-    .attr("ry", 4)
-    .attr("fill", "black");
-  const companyTextCompany = companyGroup.append("text")
-    .attr("dominant-baseline", "middle")
-    .attr("text-anchor", "end")
-    .attr("fill", "white")
-    .attr("font-weight", "bold")
-    .text("Company");
-  const companyTextOrg = companyGroup.append("text")
-    .attr("dominant-baseline", "middle")
-    .attr("text-anchor", "start")
-    .attr("fill", "red")
-    .attr("font-weight", "bold")
-    .text("Organization");
-
-  circleSvg.on("click", event => zoom(event, root));
-
-  zoomTo(targetView(root));
-
-  function targetView(d) {
-    const r = d.r;
-    const safety = 0.8;
-    const usableWidth  = (width  - 2 * margin) * safety;
-    const usableHeight = (height - 2 * margin) * safety;
-    const scaleX = usableWidth  / (2 * r);
-    const scaleY = usableHeight / (2 * r);
-    const scale = Math.min(scaleX, scaleY);
-    const size = width / scale;
-    return [d.x, d.y, size];
-  }
-
-  function zoom(event, d) {
-    focus = d;
-    const target = targetView(focus);
-
-    circleSvg.transition()
-      .duration(event && event.altKey ? 7500 : 750)
-      .tween("zoom", () => {
-        const i = d3.interpolateZoom(view, target);
-        return t => zoomTo(i(t));
-      });
-  }
-
-  function zoomTo(v) {
-    const k = width / v[2];
-    view = v;
-
-    node.attr("transform", d =>
-      `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`
-    );
-    circle.attr("r", d => d.r * k);
-
-    text.style("display", d =>
-      d.parent === focus && d.r * k >= MIN_LABEL_RADIUS ? "inline" : "none"
-    );
-
-    const fx = (focus.x - v[0]) * k;
-    const fy = (focus.y - v[1]) * k;
-    const fr = focus.r * k;
-
-    focusLabel
-      .attr("x", fx)
-      .attr("y", fy - fr + 14)
-      .text(focus.data.name || "")
-      .style("display", fr > 25 ? "inline" : "none");
-
-    const rootX = (root.x - v[0]) * k;
-    const rootY = (root.y - v[1]) * k;
-    const rootR = root.r * k;
-
-    const pillWidth = 240;
-    const pillHeight = 30;
-
-    companyGroup
-      .attr("transform", `translate(${rootX},${rootY - rootR + pillHeight/2 + 6})`)
-      .style("display", rootR > 40 ? "inline" : "none");
-
-    companyBg
-      .attr("x", -pillWidth / 2)
-      .attr("y", -pillHeight / 2)
-      .attr("width", pillWidth)
-      .attr("height", pillHeight);
-
-    companyTextCompany
-      .attr("x", -10)
-      .attr("y", 0);
-
-    companyTextOrg
-      .attr("x", 0)
-      .attr("y", 0);
-  }
-
-  // --------- flat people + reporting relationships ----------
-  const people = [];
-  root.each(d => {
-    if (!d.children && d.data.level === "person") {
-      people.push(d.data);
+    function showCircle() {
+      tabCircleBtn.classList.add("active");
+      tabTreeBtn.classList.remove("active");
+      circleContainer.style.display = "block";
+      treeContainer.style.display = "none";
+      // right panel is controlled by zoom state + selected person
     }
-  });
 
-  const nodeById = new Map();
-  people.forEach(p => {
-    nodeById.set(p.userId, {
-      id: p.userId,
-      name: p.name,
-      title: p.title || p.role || "",
-      manager_id: p.manager_id,
-      children: []
+    function showTree() {
+      tabTreeBtn.classList.add("active");
+      tabCircleBtn.classList.remove("active");
+
+      circleContainer.style.display = "none";
+      treeContainer.style.display = "block";
+
+      // In tree view: hide chain + reset split (tree is full width)
+      rightPanel.classList.remove("show");
+      circleContainer.classList.remove("split");
+
+      setTimeout(recenterTree, 50);
+    }
+
+    tabCircleBtn.addEventListener("click", showCircle);
+    tabTreeBtn.addEventListener("click", showTree);
+
+    panelClose.addEventListener("click", () => {
+      selectedPersonId = null;
+      panelSubtitle.textContent = "";
+      rightPanel.classList.remove("show");
+      d3.select("#chain-svg").selectAll("*").remove();
     });
-  });
 
-  nodeById.forEach(n => { n.children = []; });
-  nodeById.forEach(n => {
-    if (n.manager_id && nodeById.has(n.manager_id)) {
-      nodeById.get(n.manager_id).children.push(n);
-    }
-  });
+    /* ----------------- circle setup (preserve original geometry) ----------------- */
+    const circleSvg = d3.select("#circle-svg");
+    const circleWidth = window.innerWidth;   // KEEP FULL WIDTH => preserves pack shape
+    const circleHeight = window.innerHeight;
+    const margin = 20;
 
-  // ---------- search ----------
-  const input = document.getElementById("search-input");
-  const button = document.getElementById("search-button");
+    const gCircle = circleSvg.append("g")
+      .attr("transform", `translate(${circleWidth / 2},${circleHeight / 2})`);
 
-  function findPersonNodeCircleByName(name) {
-    const n = name.trim().toLowerCase();
-    if (!n) return null;
-    return nodes.find(d =>
-      !d.children &&
-      d.data.level === "person" &&
-      d.data.name &&
-      d.data.name.toLowerCase() === n
-    ) || null;
-  }
+    // NEW: a group for a single "focus title" above the current zoomed circle
+    const gCircleTitle = circleSvg.append("g");
+    const focusCircleTitle = gCircleTitle.append("text")
+      .attr("class", "circle-focus-title")
+      .style("display", "none");
 
-  button.addEventListener("click", () => {
-    const val = input.value;
-    const nCircle = findPersonNodeCircleByName(val);
-    if (nCircle) {
-      const targetNode = nCircle.parent || nCircle;
-      zoom(null, targetNode);
-      renderContextTree(nCircle.data.userId);
-    }
-  });
+    const colorScale = d3.scaleOrdinal()
+      .domain(["company","portfolio","value_stream","art","product_team","person"])
+      .range(["#f1f1f1","#c7e9c0","#9ecae1","#fdd0a2","#d4b9da","#ffffff"]);
 
-  input.addEventListener("keydown", e => {
-    if (e.key === "Enter") {
-      button.click();
-    }
-  });
+    const pack = d3.pack()
+      .size([circleWidth - 2 * margin, circleHeight - 2 * margin]) // KEEP => preserves shape
+      .padding(3);
 
-  // ---------- context tree: managers chain + clickable reports ----------
-  function buildContextData(userId) {
-    if (!nodeById.has(userId)) return null;
+    const tooltip = d3.select("#tooltip");
 
-    const person = nodeById.get(userId);
+    /* ----------------- chain panel rendering ----------------- */
+    const chainSvg = d3.select("#chain-svg");
 
-    // manager chain (top -> person)
-    const chain = [];
-    let current = person;
-    while (current) {
-      chain.unshift(current);
-      if (!current.manager_id || !nodeById.has(current.manager_id)) break;
-      current = nodeById.get(current.manager_id);
-    }
+    function computeManagerChain(userId) {
+      const chain = [];
+      const seen = new Set();
+      let currId = userId;
 
-    function cloneBase(n) {
-      return {
-        id: n.id,
-        name: n.name,
-        title: n.title,
-        children: null,
-        _children: null
-      };
-    }
+      while (currId && !seen.has(currId)) {
+        seen.add(currId);
+        chain.push(currId);
 
-    function cloneReportsForCollapsible(n) {
-      const c = cloneBase(n);
-      if (n.children && n.children.length) {
-        c.children = n.children.map(ch => cloneReportsForCollapsible(ch));
+        const p = personById.get(currId);
+        const next = p ? p.manager_id : null;
+        if (!next || next === currId) break;
+
+        if (!personById.has(next)) {
+          chain.push(next);
+          break;
+        }
+        currId = next;
       }
-      return c;
+      return chain;
     }
 
-    let contextRoot = null;
-    let prevClone = null;
+    function renderManagerChain(userId) {
+      selectedPersonId = userId;
 
-    for (let i = 0; i < chain.length; i++) {
-      const original = chain[i];
-      const isSelected = original.id === person.id;
-      const cloned = isSelected ? cloneReportsForCollapsible(original) : cloneBase(original);
+      const chainBottomUp = computeManagerChain(userId);
+      const chainTopDown = [...chainBottomUp].reverse();
 
-      if (prevClone) {
-        prevClone.children = prevClone.children || [];
-        prevClone.children.push(cloned);
+      const selected = personById.get(userId);
+      panelSubtitle.textContent = selected ? (selected.name || "") : "";
+
+      rightPanel.classList.add("show");
+
+      const w = rightPanel.clientWidth || (window.innerWidth * 0.5);
+      const h = rightPanel.clientHeight - 48 || (window.innerHeight - 88);
+      chainSvg.attr("width", w).attr("height", h);
+
+      chainSvg.selectAll("*").remove();
+      const g = chainSvg.append("g").attr("transform", "translate(0,0)");
+
+      const cardW = Math.min(360, w - 80);
+      const cardH = 78;
+      const x = w / 2;
+      const topPad = 24;
+      const gap = 28;
+
+      const n = chainTopDown.length;
+      const idealStep = cardH + gap;
+      const needed = topPad + n * idealStep;
+      const scaleY = needed > h ? (h - topPad) / (n * idealStep) : 1;
+      const step = idealStep * scaleY;
+
+      for (let i = 0; i < n - 1; i++) {
+        const y1 = topPad + i * step + cardH;
+        const y2 = topPad + (i + 1) * step;
+        g.append("path")
+          .attr("class", "chain-link")
+          .attr("d", `M${x},${y1} V${(y1+y2)/2} V${y2}`);
+      }
+
+      const nodes = g.selectAll("g.chain-node")
+        .data(chainTopDown.map(id => {
+          const p = personById.get(id);
+          return {
+            id,
+            name: p?.name || (id === userId ? "Selected person" : "Unknown"),
+            title: p?.title || "",
+            isSelected: id === userId,
+            isManager: id !== userId
+          };
+        }))
+        .enter()
+        .append("g")
+        .attr("class", "chain-node")
+        .attr("transform", (_, i) => `translate(${x - cardW/2},${topPad + i * step})`);
+
+      nodes.append("rect")
+        .attr("class", d => d.isSelected ? "chain-card selected" : "chain-card manager")
+        .attr("width", cardW)
+        .attr("height", cardH);
+
+      nodes.append("text")
+        .attr("class", "chain-name")
+        .attr("x", cardW / 2)
+        .attr("y", 28)
+        .text(d => d.name || "");
+
+      nodes.append("text")
+        .attr("class", "chain-title")
+        .attr("x", cardW / 2)
+        .attr("y", 48)
+        .text(d => d.title || "");
+
+      nodes.append("text")
+        .attr("class", "chain-level")
+        .attr("x", cardW / 2)
+        .attr("y", 66)
+        .text(d => d.isSelected ? "Selected" : "Manager");
+    }
+
+    function hideManagerChain() {
+      selectedPersonId = null;
+      panelSubtitle.textContent = "";
+      rightPanel.classList.remove("show");
+      chainSvg.selectAll("*").remove();
+    }
+
+    /* ----------------- circle zoom mechanics ----------------- */
+    function fullOrgView(circleRoot) {
+      const k = 0.85;
+      const r = circleRoot.r;
+      const viewSize = (2 * r) / k;
+      return [circleRoot.x, circleRoot.y, viewSize];
+    }
+
+    function zoomTo(circlesSel, labelsSel, v, applyLeftShift) {
+      const k = Math.min(circleWidth, circleHeight) / v[2];
+      viewGlobal = v;
+
+      const xShift = applyLeftShift ? circleWidth * 0.25 : 0;
+
+      circlesSel
+        .attr("transform", d => `translate(${(d.x - v[0]) * k - xShift},${(d.y - v[1]) * k})`)
+        .attr("r", d => d.r * k);
+
+      labelsSel
+        .attr("transform", d => `translate(${(d.x - v[0]) * k - xShift},${(d.y - v[1]) * k})`)
+        .style("display", d => (d.parent === focusGlobal && d.r * k > 30) ? "inline" : "none");
+
+      // NEW: show the focused circle's title above it, black + bold
+      // Compute focus center in screen coords (same math as circles)
+      const fx = (focusGlobal.x - v[0]) * k - xShift + circleWidth / 2;
+      const fy = (focusGlobal.y - v[1]) * k + circleHeight / 2;
+      const fr = focusGlobal.r * k;
+
+      const title = (focusGlobal && focusGlobal.data) ? (focusGlobal.data.name || "") : "";
+      if (title && focusGlobal !== circleRootGlobal) {
+        focusCircleTitle
+          .attr("x", fx)
+          .attr("y", fy - fr - 18)  // above the circle
+          .text(title)
+          .style("display", "block");
       } else {
-        contextRoot = cloned;
+        // hide title at full org/root view (or if no name)
+        focusCircleTitle.style("display", "none");
       }
-      prevClone = cloned;
     }
 
-    return contextRoot;
-  }
+    /* ----------------- tree setup (restored) ----------------- */
+    const orgSvg = d3.select("#org-tree-svg");
+    const orgG  = orgSvg.append("g");
+    const treeZoom = d3.zoom().on("zoom", (event) => orgG.attr("transform", event.transform));
+    orgSvg.call(treeZoom);
 
-  function renderContextTree(userId) {
-    orgG.selectAll("*").remove();
-    const treeData = buildContextData(userId);
-    if (!treeData) return;
+    const treeLayout = d3.tree().nodeSize([180, 120]);
+    const boxWidth = 130, boxHeight = 50;
 
-    const hRoot = d3.hierarchy(treeData);
+    function updateTree() {
+      if (!fullHierarchyRoot) return;
 
-    const hasReports = hRoot.descendants().some(d => d.depth > 0);
-    if (!hasReports) {
-      const x = 0, y = 0;
-      orgG.attr("transform", `translate(${orgWidth / 2}, 80)`);
-
-      const gNode = orgG.append("g")
-        .attr("class", "org-node")
-        .attr("transform", `translate(${x},${y})`);
-
-      gNode.append("rect")
-        .attr("x", -boxWidth / 2)
-        .attr("y", -boxHeight / 2)
-        .attr("width", boxWidth)
-        .attr("height", boxHeight)
-        .attr("stroke", "#d62728")
-        .attr("stroke-width", 2);
-
-      gNode.append("text")
-        .attr("y", -6)
-        .text(hRoot.data.name);
-
-      gNode.append("text")
-        .attr("y", 10)
-        .attr("fill", "#555")
-        .text(hRoot.data.title || "");
-
-      return;
-    }
-
-    // collapse reports initially (manager chain open)
-    hRoot.each(d => {
-      const isOnChain = d.ancestors().some(a => a.data.id === userId);
-      if (!isOnChain && d.depth > 0 && d.children) {
-        d._children = d.children;
-        d.children = null;
-      }
-    });
-
-    update(hRoot);
-
-    function update(source) {
-      treeLayout(hRoot);
-      const nodesT = hRoot.descendants();
-      const linksT = hRoot.links();
-
-      nodesT.forEach(d => {
-        d.y = d.depth * 80;
-      });
-
-      const minX = d3.min(nodesT, d => d.x);
-      const maxX = d3.max(nodesT, d => d.x);
-      const xShift = - (minX + maxX) / 2;
-      orgG.attr("transform", `translate(${orgWidth / 2}, 40)`);
+      treeLayout(fullHierarchyRoot);
+      const nodes = fullHierarchyRoot.descendants();
+      const links = fullHierarchyRoot.links();
+      const halfBox = boxHeight / 2;
 
       orgG.selectAll(".org-link")
-        .data(linksT)
+        .data(links)
         .join("path")
         .attr("class", "org-link")
-        .attr("d", d => `
-          M ${d.source.x + xShift},${d.source.y}
-          V ${(d.source.y + d.target.y) / 2}
-          H ${d.target.x + xShift}
-          V ${d.target.y}
-        `);
-
-      const nodeG = orgG.selectAll(".org-node")
-        .data(nodesT)
-        .join("g")
-        .attr("class", "org-node")
-        .attr("transform", d => `translate(${d.x + xShift},${d.y})`)
-        .on("click", (event, d) => {
-          event.stopPropagation();
-          if (d.children) {
-            d._children = d.children;
-            d.children = null;
-          } else if (d._children) {
-            d.children = d._children;
-            d._children = null;
-          }
-          update(d);
+        .attr("d", d => {
+          const startY = d.source.y + halfBox;
+          const endY = d.target.y - halfBox;
+          const midY = (startY + endY) / 2;
+          return `M${d.source.x},${startY}V${midY}H${d.target.x}V${endY}`;
         });
 
-      nodeG.selectAll("rect").remove();
-      nodeG.selectAll("text").remove();
+      const nodeG = orgG.selectAll(".org-node")
+        .data(nodes)
+        .join("g")
+        .attr("class", "org-node")
+        .attr("transform", d => `translate(${d.x},${d.y})`)
+        .on("click", (event, d) => {
+          if (d.children) { d._children = d.children; d.children = null; }
+          else if (d._children) { d.children = d._children; d._children = null; }
+          updateTree();
+        });
 
-      nodeG.append("rect")
+      nodeG.selectAll("rect")
+        .data(d => [d])
+        .join("rect")
         .attr("x", -boxWidth / 2)
         .attr("y", -boxHeight / 2)
         .attr("width", boxWidth)
         .attr("height", boxHeight)
-        .attr("stroke", d => d.data.id === userId ? "#d62728" : "#d4c0af")
-        .attr("stroke-width", d => d.data.id === userId ? 2 : 1.2);
+        .attr("stroke", d => d.data.userId === currentTreeHighlightId ? "#007bff" : "#d4c0af")
+        .attr("stroke-width", d => d.data.userId === currentTreeHighlightId ? 3 : 1.2);
 
-      nodeG.append("text")
+      nodeG.selectAll(".n-text")
+        .data(d => [d])
+        .join("text")
+        .attr("class", "n-text")
         .attr("y", -6)
+        .attr("font-weight", "bold")
         .text(d => d.data.name);
 
-      nodeG.append("text")
+      nodeG.selectAll(".t-text")
+        .data(d => [d])
+        .join("text")
+        .attr("class", "t-text")
         .attr("y", 10)
-        .attr("fill", "#555")
+        .attr("fill", "#666")
         .text(d => d.data.title || "");
     }
-  }
 
-  // right side starts empty
-  orgG.selectAll("*").remove();
-});
-</script>
+    function recenterTree() {
+      const w = treeContainer.clientWidth || window.innerWidth;
+      const t = d3.zoomIdentity.translate(w / 2, 80).scale(1);
+      orgSvg.transition().duration(500).call(treeZoom.transform, t);
+    }
+
+    function highlightInTree(userId) {
+      currentTreeHighlightId = userId;
+
+      let targetNode = null;
+      fullHierarchyRoot.each(d => {
+        if (d.data.userId === userId) targetNode = d;
+      });
+
+      if (targetNode) {
+        let curr = targetNode.parent;
+        while (curr) {
+          if (curr._children) { curr.children = curr._children; curr._children = null; }
+          curr = curr.parent;
+        }
+      }
+
+      updateTree();
+    }
+
+    /* ----------------- load data (circle + tree) ----------------- */
+    d3.json("employees_hierarchy.json").then(data => {
+      const circleRoot = d3.hierarchy(data)
+        .sum(d => d.level === "person" ? 1 : 0)
+        .sort((a, b) => b.value - a.value);
+
+      circleRootGlobal = circleRoot;
+      focusGlobal = circleRoot;
+
+      circleRoot.each(d => {
+        if (!d.children && d.data.level === "person") {
+          personById.set(d.data.userId, d.data);
+        }
+      });
+
+      circleNodesData = pack(circleRoot).descendants();
+      viewGlobal = fullOrgView(circleRoot);
+
+      const circles = gCircle.selectAll("circle")
+        .data(circleNodesData)
+        .join("circle")
+          .attr("class", d => d.parent ? (d.children ? "node" : "node node--leaf") : "node node--root")
+          .attr("fill", d => colorScale(d.data.level || (d.children ? "company" : "person")))
+          .on("click", (event, d) => {
+            const isPerson = (!d.children && d.data.level === "person");
+            const target = (d.children || !isPerson) ? d : d.parent;
+
+            if (isPerson && d.data.userId) {
+              renderManagerChain(d.data.userId);
+              highlightInTree(d.data.userId);
+            } else {
+              hideManagerChain();
+              currentTreeHighlightId = null;
+              updateTree();
+            }
+
+            zoomToCircleInternal(target);
+            event.stopPropagation();
+          })
+          .on("mousemove", (event, d) => {
+            if (!d.children && d.data.level === "person") {
+              const p = d.data;
+              tooltip.style("opacity", 1)
+                .style("left", (event.pageX + 15) + "px")
+                .style("top",  (event.pageY + 15) + "px")
+                .html(`<strong>${p.name || ""}</strong><br>${p.title || ""}`);
+            }
+          })
+          .on("mouseleave", () => tooltip.style("opacity", 0));
+
+      const labels = gCircle.selectAll("text.node-label")
+        .data(circleNodesData.filter(d => d !== circleRoot))
+        .join("text")
+          .attr("class", "label node-label")
+          .style("display", "none")
+          .text(d => d.data.name);
+
+      function zoomToCircleInternal(d) {
+        focusGlobal = d;
+
+        const zoomSize = d.r * 2.8;
+        const target = [d.x, d.y, zoomSize];
+
+        const isZoomed = (d !== circleRoot);
+
+        circleContainer.classList.toggle("split", isZoomed);
+
+        if (isZoomed && selectedPersonId) rightPanel.classList.add("show");
+        if (!isZoomed) hideManagerChain();
+
+        circleSvg.transition().duration(750).tween("zoom", () => {
+          const i = d3.interpolateZoom(viewGlobal, target);
+          return t => zoomTo(circles, labels, i(t), isZoomed);
+        });
+      }
+
+      // initial centered + full width
+      circleContainer.classList.remove("split");
+      rightPanel.classList.remove("show");
+      focusGlobal = circleRoot; // ensure title logic knows we're at root
+      zoomTo(circles, labels, fullOrgView(circleRoot), false);
+
+      // clicking background resets
+      circleSvg.on("click", (event) => {
+        if (event.target.tagName === "svg") {
+          hideManagerChain();
+          currentTreeHighlightId = null;
+          updateTree();
+          focusGlobal = circleRoot;
+          zoomToCircleInternal(circleRoot);
+        }
+      });
+
+      // search: exact name match
+      document.getElementById("search-button").addEventListener("click", () => {
+        const val = document.getElementById("search-input").value.trim().toLowerCase();
+        if (!val) return;
+
+        const personNode = circleNodesData.find(d =>
+          !d.children &&
+          d.data.level === "person" &&
+          (d.data.name || "").toLowerCase() === val
+        );
+
+        if (personNode) {
+          renderManagerChain(personNode.data.userId);
+          highlightInTree(personNode.data.userId);
+          zoomToCircleInternal(personNode.parent || personNode);
+          showCircle();
+        }
+      });
+
+      /* ------------- Build Tree hierarchy (restored) ------------- */
+      const people = [];
+      circleRoot.each(d => { if (!d.children && d.data.level === "person") people.push(d.data); });
+
+      const nodeById = new Map(people.map(p => [p.userId, { ...p, children: [] }]));
+      const managerRoot = { id: "ROOT", name: "Organization", title: "Global View", children: [] };
+
+      nodeById.forEach(n => {
+        const parent = nodeById.get(n.manager_id) || managerRoot;
+        parent.children.push(n);
+      });
+
+      fullHierarchyRoot = d3.hierarchy(managerRoot);
+
+      fullHierarchyRoot.descendants().forEach(d => {
+        if (d.depth > 0 && d.children) { d._children = d.children; d.children = null; }
+      });
+
+      updateTree();
+    });
+  </script>
 </body>
