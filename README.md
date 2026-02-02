@@ -93,4 +93,4 @@ Open your browser and go to:
 
 It will open the following page:
 
-![Org visualization initial page](initial_page.png)
+![Org visualization initial page](Initial_page.png)
