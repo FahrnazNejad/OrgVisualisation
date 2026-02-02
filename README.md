@@ -95,6 +95,6 @@ It will open the following page:
 
 ![Org visualization initial page](Initial_page.png)
 
-Searching the name of an employee in the search box, will zoom into the Product Team/ ART/ Value Stream/ Portfolio of that employee in the left and show their direct and inderct managers on the righ side. Beloe there is an example how it will look:
+Searching the name of an employee in the search box, will zoom into the Product Team/ ART/ Value Stream/ Portfolio of that employee in the left and and clicking on their name, shows their direct and inderct managers on the righ side. Below there is an example how it will look:
 
 ![Org visualization Search page](Search.png)

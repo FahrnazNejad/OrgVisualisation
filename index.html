@@ -69,19 +69,15 @@
     background: #f7f7f7;
   }
 
-  /* Circle container: full width by default, only 50% when zoomed */
+  /* circle view area (left side) */
   #circle-container {
     position: absolute;
     top: 0; left: 0; bottom: 0;
     width: 100%;
-    overflow: hidden;          /* clipping happens here */
-    transition: width 250ms ease;
-  }
-  #circle-container.split {
-    width: 50%;
+    overflow: hidden;
   }
 
-  /* Right panel: hidden by default, shown only when zoomed (and person selected) */
+  /* manager-chain panel (right side) */
   #right-panel {
     position: absolute;
     top: 0; right: 0; bottom: 0;
@@ -135,7 +131,6 @@
     overflow: auto;
   }
 
-  /* chain svg */
   #chain-svg {
     width: 100%;
     height: 100%;
@@ -143,7 +138,7 @@
     background: #fff;
   }
 
-  /* Tree container (full width) */
+  /* tree view */
   #tree-container {
     position: absolute;
     inset: 0;
@@ -174,7 +169,6 @@
     line-height: 1.4;
   }
 
-  /* chain styles */
   .chain-link {
     fill: none;
     stroke: #cfcfcf;
@@ -212,7 +206,6 @@
     text-anchor: middle;
   }
 
-  /* Tree styles (from your reference) */
   .org-node rect {
     fill: #fff;
     stroke: #d4c0af;
@@ -230,7 +223,6 @@
     stroke-width: 1.5px;
   }
 
-  /* NEW: zoomed circle title */
   .circle-focus-title {
     font-weight: 800;
     fill: #000;
@@ -242,8 +234,8 @@
 
 <body>
   <div id="top-ribbon">
-    <span class="brand-white">Company</span>
-    <span class="brand-red">Organization</span>
+    <span class="brand-white">Porsche</span>
+    <span class="brand-red">Digital</span>
   </div>
 
   <div id="tabs">
@@ -261,7 +253,6 @@
       <svg id="circle-svg"></svg>
     </div>
 
-    <!-- Right chain panel (shown only when zoomed + person selected) -->
     <div id="right-panel">
       <div id="panel-header">
         <div id="panel-header-left">
@@ -275,7 +266,6 @@
       </div>
     </div>
 
-    <!-- Tree view (restored) -->
     <div id="tree-container">
       <svg id="org-tree-svg"></svg>
     </div>
@@ -283,48 +273,41 @@
 
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script>
-    /* ----------------- globals ----------------- */
+    // globals
     let circleNodesData = [];
-    let personById = new Map();   // userId -> person (includes manager_id)
-    let viewGlobal = null;
+    let personById = new Map();
+    let viewGlobal = null;      // [cx, cy, width]
     let focusGlobal = null;
     let circleRootGlobal = null;
 
     let selectedPersonId = null;
 
-    // Tree globals (restored)
     let fullHierarchyRoot = null;
     let currentTreeHighlightId = null;
 
-    /* ----------------- DOM refs ----------------- */
+    // DOM refs
     const tabCircleBtn = document.getElementById("tab-circle");
     const tabTreeBtn   = document.getElementById("tab-tree");
     const circleContainer = document.getElementById("circle-container");
     const treeContainer   = document.getElementById("tree-container");
 
-    const rightPanel = document.getElementById("right-panel");
-    const panelSubtitle = document.getElementById("panel-subtitle");
-    const panelClose = document.getElementById("panel-close");
+    const rightPanel     = document.getElementById("right-panel");
+    const panelSubtitle  = document.getElementById("panel-subtitle");
+    const panelClose     = document.getElementById("panel-close");
 
     function showCircle() {
       tabCircleBtn.classList.add("active");
       tabTreeBtn.classList.remove("active");
       circleContainer.style.display = "block";
       treeContainer.style.display = "none";
-      // right panel is controlled by zoom state + selected person
     }
 
     function showTree() {
       tabTreeBtn.classList.add("active");
       tabCircleBtn.classList.remove("active");
-
       circleContainer.style.display = "none";
       treeContainer.style.display = "block";
-
-      // In tree view: hide chain + reset split (tree is full width)
       rightPanel.classList.remove("show");
-      circleContainer.classList.remove("split");
-
       setTimeout(recenterTree, 50);
     }
 
@@ -338,16 +321,15 @@
       d3.select("#chain-svg").selectAll("*").remove();
     });
 
-    /* ----------------- circle setup (preserve original geometry) ----------------- */
+    // circle packing setup
     const circleSvg = d3.select("#circle-svg");
-    const circleWidth = window.innerWidth;   // KEEP FULL WIDTH => preserves pack shape
+    const circleWidth = window.innerWidth;
     const circleHeight = window.innerHeight;
     const margin = 20;
 
     const gCircle = circleSvg.append("g")
       .attr("transform", `translate(${circleWidth / 2},${circleHeight / 2})`);
 
-    // NEW: a group for a single "focus title" above the current zoomed circle
     const gCircleTitle = circleSvg.append("g");
     const focusCircleTitle = gCircleTitle.append("text")
       .attr("class", "circle-focus-title")
@@ -358,12 +340,12 @@
       .range(["#f1f1f1","#c7e9c0","#9ecae1","#fdd0a2","#d4b9da","#ffffff"]);
 
     const pack = d3.pack()
-      .size([circleWidth - 2 * margin, circleHeight - 2 * margin]) // KEEP => preserves shape
+      .size([circleWidth - 2 * margin, circleHeight - 2 * margin])
       .padding(3);
 
     const tooltip = d3.select("#tooltip");
 
-    /* ----------------- chain panel rendering ----------------- */
+    // chain panel
     const chainSvg = d3.select("#chain-svg");
 
     function computeManagerChain(userId) {
@@ -473,31 +455,39 @@
       chainSvg.selectAll("*").remove();
     }
 
-    /* ----------------- circle zoom mechanics ----------------- */
+    // zoom helpers
     function fullOrgView(circleRoot) {
-      const k = 0.85;
+      const k = 0.95;  // outer circle uses ~95% of min dimension
       const r = circleRoot.r;
       const viewSize = (2 * r) / k;
       return [circleRoot.x, circleRoot.y, viewSize];
     }
 
-    function zoomTo(circlesSel, labelsSel, v, applyLeftShift) {
-      const k = Math.min(circleWidth, circleHeight) / v[2];
+    // zoom: v = [cx, cy, width], isZoomedLeft = whether to center in left half
+    function zoomTo(circlesSel, labelsSel, v, isZoomedLeft) {
+      const baseK = Math.min(circleWidth, circleHeight) / v[2];
+
+      // when zoomed, keep circle slightly smaller so it fits left panel
+      const fraction = isZoomedLeft ? 0.8 : 1.0;  // 1.0 for full-org (no extra shrink)
+      const k = baseK * fraction;
+
       viewGlobal = v;
 
-      const xShift = applyLeftShift ? circleWidth * 0.25 : 0;
+      const leftPanelCenter = circleWidth * 0.25;   // center of left half
+      const screenCenterX   = circleWidth / 2;
+      const centerShift     = isZoomedLeft ? (screenCenterX - leftPanelCenter) : 0;
 
       circlesSel
-        .attr("transform", d => `translate(${(d.x - v[0]) * k - xShift},${(d.y - v[1]) * k})`)
+        .attr("transform", d =>
+          `translate(${(d.x - v[0]) * k - centerShift},${(d.y - v[1]) * k})`)
         .attr("r", d => d.r * k);
 
       labelsSel
-        .attr("transform", d => `translate(${(d.x - v[0]) * k - xShift},${(d.y - v[1]) * k})`)
+        .attr("transform", d =>
+          `translate(${(d.x - v[0]) * k - centerShift},${(d.y - v[1]) * k})`)
         .style("display", d => (d.parent === focusGlobal && d.r * k > 30) ? "inline" : "none");
 
-      // NEW: show the focused circle's title above it, black + bold
-      // Compute focus center in screen coords (same math as circles)
-      const fx = (focusGlobal.x - v[0]) * k - xShift + circleWidth / 2;
+      const fx = (focusGlobal.x - v[0]) * k - centerShift + circleWidth / 2;
       const fy = (focusGlobal.y - v[1]) * k + circleHeight / 2;
       const fr = focusGlobal.r * k;
 
@@ -505,16 +495,15 @@
       if (title && focusGlobal !== circleRootGlobal) {
         focusCircleTitle
           .attr("x", fx)
-          .attr("y", fy - fr - 18)  // above the circle
+          .attr("y", fy - fr - 18)
           .text(title)
           .style("display", "block");
       } else {
-        // hide title at full org/root view (or if no name)
         focusCircleTitle.style("display", "none");
       }
     }
 
-    /* ----------------- tree setup (restored) ----------------- */
+    // tree setup
     const orgSvg = d3.select("#org-tree-svg");
     const orgG  = orgSvg.append("g");
     const treeZoom = d3.zoom().on("zoom", (event) => orgG.attr("transform", event.transform));
@@ -605,7 +594,7 @@
       updateTree();
     }
 
-    /* ----------------- load data (circle + tree) ----------------- */
+    // load data and build views
     d3.json("employees_hierarchy.json").then(data => {
       const circleRoot = d3.hierarchy(data)
         .sum(d => d.level === "person" ? 1 : 0)
@@ -647,10 +636,34 @@
           .on("mousemove", (event, d) => {
             if (!d.children && d.data.level === "person") {
               const p = d.data;
-              tooltip.style("opacity", 1)
+
+              const name        = p.name || "";
+              const location    = p.location || "";
+              const role        = p.role   || p.title || "";
+              const portfolio   = p.portfolio || p.department || "";
+              const valueStream = p.valueStream || "";
+              const productTeam = p.product_team || p.productTeam || "";
+
+              const managerObj   = p.manager_id ? personById.get(p.manager_id) : null;
+              const managerName  = managerObj ? (managerObj.name || "") : "";
+              const managerEmail = p.managerEmail || (managerObj ? (managerObj.email || "") : "");
+
+              const html = `
+                <div><strong>${name}</strong></div>
+                ${location     ? `<div>Location: ${location}</div>`               : ""}
+                ${role         ? `<div>Role: ${role}</div>`                       : ""}
+                ${managerName  ? `<div>Direct manager: ${managerName}</div>`      : ""}
+                ${managerEmail ? `<div>Manager email: ${managerEmail}</div>`      : ""}
+                ${portfolio    ? `<div>Portfolio: ${portfolio}</div>`             : ""}
+                ${valueStream  ? `<div>Value stream: ${valueStream}</div>`        : ""}
+                ${productTeam  ? `<div>Product team: ${productTeam}</div>`        : ""}
+              `;
+
+              tooltip
+                .style("opacity", 1)
                 .style("left", (event.pageX + 15) + "px")
                 .style("top",  (event.pageY + 15) + "px")
-                .html(`<strong>${p.name || ""}</strong><br>${p.title || ""}`);
+                .html(html);
             }
           })
           .on("mouseleave", () => tooltip.style("opacity", 0));
@@ -665,40 +678,36 @@
       function zoomToCircleInternal(d) {
         focusGlobal = d;
 
-        const zoomSize = d.r * 2.8;
+        // choose view width so the circle fits nicely in left panel
+        const zoomSize = d.r * 3.0;
         const target = [d.x, d.y, zoomSize];
 
-        const isZoomed = (d !== circleRoot);
-
-        circleContainer.classList.toggle("split", isZoomed);
-
-        if (isZoomed && selectedPersonId) rightPanel.classList.add("show");
-        if (!isZoomed) hideManagerChain();
+        const isZoomedLeft = (d !== circleRootGlobal);
 
         circleSvg.transition().duration(750).tween("zoom", () => {
           const i = d3.interpolateZoom(viewGlobal, target);
-          return t => zoomTo(circles, labels, i(t), isZoomed);
+          return t => zoomTo(circles, labels, i(t), isZoomedLeft);
         });
       }
 
-      // initial centered + full width
-      circleContainer.classList.remove("split");
-      rightPanel.classList.remove("show");
-      focusGlobal = circleRoot; // ensure title logic knows we're at root
+      // initial full-org view (almost fills window)
       zoomTo(circles, labels, fullOrgView(circleRoot), false);
 
-      // clicking background resets
+      // background click resets
       circleSvg.on("click", (event) => {
         if (event.target.tagName === "svg") {
           hideManagerChain();
           currentTreeHighlightId = null;
           updateTree();
           focusGlobal = circleRoot;
-          zoomToCircleInternal(circleRoot);
+          circleSvg.transition().duration(750).tween("zoom", () => {
+            const i = d3.interpolateZoom(viewGlobal, fullOrgView(circleRoot));
+            return t => zoomTo(circles, labels, i(t), false);
+          });
         }
       });
 
-      // search: exact name match
+      // search
       document.getElementById("search-button").addEventListener("click", () => {
         const val = document.getElementById("search-input").value.trim().toLowerCase();
         if (!val) return;
@@ -717,12 +726,11 @@
         }
       });
 
-      /* ------------- Build Tree hierarchy (restored) ------------- */
       const people = [];
       circleRoot.each(d => { if (!d.children && d.data.level === "person") people.push(d.data); });
 
       const nodeById = new Map(people.map(p => [p.userId, { ...p, children: [] }]));
-      const managerRoot = { id: "ROOT", name: "Organization", title: "Global View", children: [] };
+      const managerRoot = { id: "ROOT", name: "Porsche Digital", title: "Global View", children: [] };
 
       nodeById.forEach(n => {
         const parent = nodeById.get(n.manager_id) || managerRoot;
