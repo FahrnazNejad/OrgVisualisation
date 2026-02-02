@@ -100,4 +100,9 @@ Searching the name of an employee in the search box, will zoom into the Product 
 ![Org visualization Search page](Search.png)
 
 Hovering over the circle for each employee will show the following information for that person.
+
 ![Org visualization mouseover](mouseover.png)
+
+The TreeView tab wish show the whole organization tree view. Initially it will only show the head of the portfolios as shown below.
+
+![Org visualization TreeView page](TreeView.png)
